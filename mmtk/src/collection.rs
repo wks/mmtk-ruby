@@ -24,7 +24,9 @@ impl Collection<Ruby> for VMCollection {
     }
 
     fn block_for_gc(tls: VMMutatorThread) {
+        println!("=== Will block for GC ===");
         (upcalls().block_for_gc)(tls);
+        println!("=== Resumed ===");
     }
 
     fn spawn_gc_thread(_tls: VMThread, ctx: GCThreadContext<Ruby>) {

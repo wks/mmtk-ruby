@@ -46,7 +46,7 @@ impl ObjectClosure {
         F1: 'env + FnMut(&'static mut GCWorker<Ruby>, ObjectReference) -> ObjectReference,
         F2: 'env + FnOnce() -> T,
     {
-        debug_assert!(
+        assert!(
             self.c_function == Self::c_function_unregistered as *const _,
             "set_temporarily_and_run_code is recursively called."
         );
@@ -185,6 +185,7 @@ pub struct RubyUpcalls {
     pub scan_thread_roots: extern "C" fn(),
     pub scan_thread_root: extern "C" fn(mutator_tls: VMMutatorThread, worker_tls: VMWorkerThread),
     pub scan_object_ruby_style: extern "C" fn(object: ObjectReference),
+    pub is_parser: extern "C" fn(object: ObjectReference) -> bool,
 }
 
 unsafe impl Sync for RubyUpcalls {}
