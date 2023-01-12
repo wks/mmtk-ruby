@@ -6,6 +6,7 @@ use mmtk::util::{ObjectReference, VMMutatorThread, VMThread, VMWorkerThread};
 use mmtk::vm::{Collection, GCThreadContext};
 use mmtk::{memory_manager, MutatorContext};
 use std::borrow::Cow;
+use std::collections::HashSet;
 use std::thread;
 
 pub struct VMCollection {}
@@ -40,7 +41,9 @@ impl Collection<Ruby> for VMCollection {
         let gc_tls = unsafe { GCThreadTLS::from_vwt_check(tls) };
 
         let mut ppp_count = 0;
-        let mut pinned_count = 0;
+        let mut edges_count = 0;
+        let mut pinning_edges_count = 0;
+        let mut pin_set = HashSet::<ObjectReference>::new();
         crate::binding().ppp_registry.foreach(|obj| {
             log::info!(
                 "  PPP#{}: {} {} {}",
@@ -51,14 +54,19 @@ impl Collection<Ruby> for VMCollection {
             );
             ppp_count += 1;
 
-            let visit_object = |_worker, target_object: ObjectReference| {
+            let visit_object = |_worker, target_object: ObjectReference, pin| {
                 log::info!(
-                    "    -> pins: {} {} {}",
+                    "    -> {} {} {} {}",
+                    if pin { "(pin)" } else { "     " },
                     target_object,
                     object_type_str(target_object),
                     detail_type_str(target_object)
                 );
-                pinned_count += 1;
+                edges_count += 1;
+                if pin {
+                    pinning_edges_count += 1;
+                    pin_set.insert(target_object);
+                }
                 target_object
             };
             gc_tls
@@ -68,9 +76,11 @@ impl Collection<Ruby> for VMCollection {
                 });
         });
         log::info!(
-            "Total: {} PPPs, {} objects pinned.",
+            "Total: {} PPPs, {} edges, {} pinning edges, {} unique objects pinned.",
             ppp_count,
-            pinned_count
+            edges_count,
+            pinning_edges_count,
+            pin_set.iter().len(),
         );
     }
 
