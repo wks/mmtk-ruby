@@ -25,4 +25,12 @@ impl PPPRegistry {
         let ppps = self.ppps.lock().unwrap();
         ppps.iter().copied().for_each(f);
     }
+
+    pub fn retain_mut<F>(&self, f: F)
+    where
+        F: FnMut(&mut ObjectReference) -> bool
+    {
+        let mut ppps = self.ppps.lock().unwrap();
+        ppps.retain_mut(f);
+    }
 }
