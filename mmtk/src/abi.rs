@@ -229,6 +229,7 @@ pub struct RubyUpcalls {
     pub update_global_weak_tables: extern "C" fn(),
     pub object_type_str: extern "C" fn(object: ObjectReference) -> *const libc::c_char,
     pub detail_type_str: extern "C" fn(object: ObjectReference) -> *const libc::c_char,
+    pub is_exivar: extern "C" fn (object: ObjectReference) -> bool,
 }
 
 unsafe impl Sync for RubyUpcalls {}

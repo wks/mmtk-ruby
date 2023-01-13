@@ -24,8 +24,19 @@ fn object_type_str(object: ObjectReference) -> Cow<'static, str> {
     show_cstr((upcalls().object_type_str)(object))
 }
 
-fn detail_type_str(object: ObjectReference) -> Cow<'static, str> {
-    show_cstr((upcalls().detail_type_str)(object))
+fn detail_type_str(object: ObjectReference) -> String {
+    let orig = show_cstr((upcalls().detail_type_str)(object));
+    let one_line = orig.replace("\n", "");
+    let max_len = 50;
+    if one_line.len() > max_len {
+        format!("{}...", one_line.chars().take(max_len).collect::<String>())
+    } else {
+        one_line
+    }
+}
+
+fn is_exivar(object: ObjectReference) -> bool {
+    (upcalls().is_exivar)(object)
 }
 
 impl Collection<Ruby> for VMCollection {
@@ -46,11 +57,12 @@ impl Collection<Ruby> for VMCollection {
         let mut pin_set = HashSet::<ObjectReference>::new();
         crate::binding().ppp_registry.foreach(|obj| {
             log::info!(
-                "  PPP#{}: {} {} {}",
+                "  PPP#{}: {}{} {} {}",
                 ppp_count,
                 obj,
+                if is_exivar(obj) { "|FL_EXIVAR" } else { "" },
                 object_type_str(obj),
-                detail_type_str(obj)
+                detail_type_str(obj),
             );
             ppp_count += 1;
 
@@ -60,7 +72,7 @@ impl Collection<Ruby> for VMCollection {
                     if pin { "(pin)" } else { "     " },
                     target_object,
                     object_type_str(target_object),
-                    detail_type_str(target_object)
+                    detail_type_str(target_object),
                 );
                 edges_count += 1;
                 if pin {
@@ -82,9 +94,6 @@ impl Collection<Ruby> for VMCollection {
             pinning_edges_count,
             pin_set.iter().len(),
         );
-
-        // This is a workaround.  We should use the new VMRefClosure work packet when merged.
-        memory_manager::add_work_packet(mmtk(), WorkBucketStage::PhantomRefClosure, SweepPPPRegistry);
     }
 
     fn resume_mutators(tls: VMWorkerThread) {
@@ -140,31 +149,5 @@ impl Collection<Ruby> for VMCollection {
         _m: &T,
     ) {
         // do nothing
-    }
-}
-
-struct SweepPPPRegistry;
-impl GCWork<Ruby> for SweepPPPRegistry {
-    fn do_work(&mut self, worker: &mut GCWorker<Ruby>, _mmtk: &'static mmtk::MMTK<Ruby>) {
-        log::info!("Removing dead PPPs...");
-
-        let mut ppp_count = 0;
-        let mut retain_count = 0;
-        crate::binding().ppp_registry.retain_mut(|obj| {
-            ppp_count += 1;
-            if obj.is_live() {
-                *obj = obj.get_forwarded_object().unwrap_or(*obj);
-                retain_count += 1;
-                true
-            } else {
-                log::info!("  PPP removed: {}", *obj);
-                false
-            }
-        });
-        log::info!(
-            "Total: {} old PPPs, {} new PPPs.",
-            ppp_count,
-            retain_count,
-        );
     }
 }

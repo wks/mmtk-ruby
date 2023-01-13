@@ -93,6 +93,23 @@ impl WeakProcessor {
                     (upcalls().update_global_weak_tables)();
                     log::debug!("Finished updating global weak tables.");
                 });
+
+            log::info!("Removing dead PPPs...");
+
+            let mut ppp_count = 0;
+            let mut retain_count = 0;
+            crate::binding().ppp_registry.retain_mut(|obj| {
+                ppp_count += 1;
+                if obj.is_live() {
+                    *obj = obj.get_forwarded_object().unwrap_or(*obj);
+                    retain_count += 1;
+                    true
+                } else {
+                    log::info!("  PPP removed: {}", *obj);
+                    false
+                }
+            });
+            log::info!("Total: {} old PPPs, {} new PPPs.", ppp_count, retain_count,);
         });
     }
 }
