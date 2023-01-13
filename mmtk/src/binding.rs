@@ -5,8 +5,9 @@ use mmtk::MMTK;
 
 use crate::abi;
 use crate::abi::RubyBindingOptions;
-use crate::Ruby;
 use crate::ppp::PPPRegistry;
+use crate::weak_proc::WeakProcessor;
+use crate::Ruby;
 
 #[derive(Default)]
 pub struct RubyBindingFast {
@@ -24,6 +25,7 @@ pub struct RubyBinding {
     pub options: RubyBindingOptions,
     pub upcalls: *const abi::RubyUpcalls,
     pub plan_name: Mutex<Option<CString>>,
+    pub weak_proc: WeakProcessor,
     pub ppp_registry: crate::ppp::PPPRegistry,
 }
 
@@ -44,6 +46,7 @@ impl RubyBinding {
             options: binding_options.clone(),
             upcalls,
             plan_name: Mutex::new(None),
+            weak_proc: WeakProcessor::new(),
             ppp_registry: PPPRegistry::new(),
         }
     }

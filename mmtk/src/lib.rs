@@ -19,6 +19,7 @@ pub mod object_model;
 pub mod ppp;
 pub mod reference_glue;
 pub mod scanning;
+pub mod weak_proc;
 
 #[derive(Default)]
 pub struct Ruby;
