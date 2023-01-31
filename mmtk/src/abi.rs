@@ -1,7 +1,7 @@
 use crate::api::RubyMutator;
 use crate::{upcalls, Ruby};
 use mmtk::scheduler::{GCController, GCWorker};
-use mmtk::util::{ObjectReference, VMMutatorThread, VMWorkerThread};
+use mmtk::util::{ObjectReference, VMMutatorThread, VMWorkerThread, Address};
 
 // For the C binding
 pub const OBJREF_OFFSET: usize = 8;
@@ -9,6 +9,49 @@ pub const MIN_OBJ_ALIGN: usize = 8; // Even on 32-bit machine.  A Ruby object is
 
 pub const GC_THREAD_KIND_CONTROLLER: libc::c_int = 0;
 pub const GC_THREAD_KIND_WORKER: libc::c_int = 1;
+
+/// Provide convenient methods for accessing Ruby objects.
+/// TODO: Wrap C functions in `RubyUpcalls` as Rust-friendly methods.
+pub struct RubyObjectAccess {
+    objref: ObjectReference,
+}
+
+impl RubyObjectAccess {
+    pub fn from_objref(objref: ObjectReference) -> Self {
+        Self { objref }
+    }
+
+    fn hidden_field(&self) -> Address {
+        self.objref.to_raw_address().sub(Self::prefix_size())
+    }
+
+    pub fn payload_size(&self) -> usize {
+        unsafe {
+            // That hidden field holds the payload size.
+            self.hidden_field().load()
+        }
+    }
+
+    pub fn set_payload_size(&self, size: usize) {
+        unsafe {
+            self.hidden_field().store(size)
+        }
+    }
+
+    pub fn prefix_size() -> usize {
+        // Currently, a hidden size field of word size is placed before each object.
+        OBJREF_OFFSET
+    }
+
+    pub fn suffix_size() -> usize {
+        // In RACTOR_CHECK_MODE, Ruby hides a field after each object to hold the Ractor ID.
+        unsafe { crate::BINDING_FAST.suffix_size }
+    }
+
+    pub fn object_size(&self) -> usize {
+        Self::prefix_size() + self.payload_size() + Self::suffix_size()
+    }
+}
 
 type ObjectClosureFunction =
     extern "C" fn(*mut libc::c_void, *mut libc::c_void, ObjectReference, bool) -> ObjectReference;
@@ -229,7 +272,7 @@ pub struct RubyUpcalls {
     pub update_global_weak_tables: extern "C" fn(),
     pub object_type_str: extern "C" fn(object: ObjectReference) -> *const libc::c_char,
     pub detail_type_str: extern "C" fn(object: ObjectReference) -> *const libc::c_char,
-    pub is_exivar: extern "C" fn (object: ObjectReference) -> bool,
+    pub is_exivar: extern "C" fn(object: ObjectReference) -> bool,
 }
 
 unsafe impl Sync for RubyUpcalls {}

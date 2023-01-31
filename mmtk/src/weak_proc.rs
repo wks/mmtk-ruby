@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use mmtk::{
     scheduler::GCWorker,
     util::ObjectReference,
-    vm::{ObjectModel, ObjectTracer, ObjectTracerContext},
+    vm::{ObjectModel, ObjectTracer, ObjectTracerContext}, memory_manager,
 };
 
 use crate::{abi::GCThreadTLS, object_model::VMObjectModel, upcalls, Ruby};
@@ -60,16 +60,18 @@ impl WeakProcessor {
             let mut new_candidates = Vec::new();
 
             for object in obj_free_candidates.iter().copied() {
+                info!("Processing obj_free candidate: {}", object);
                 if object.is_reachable() {
                     // Forward and add back to the candidate list.
                     let new_object = tracer.trace_object(object);
-                    trace!(
+                    info!(
                         "Forwarding obj_free candidate: {} -> {}",
                         object,
                         new_object
                     );
                     new_candidates.push(new_object);
                 } else {
+                    info!("  Dead. Call obj_free...: {}", object);
                     (upcalls().call_obj_free)(object);
                 }
             }
@@ -110,6 +112,28 @@ impl WeakProcessor {
                 }
             });
             log::info!("Total: {} old PPPs, {} new PPPs.", ppp_count, retain_count,);
+
+            log::info!("Unpinning pinned roots...");
+            let mut roots_unpinned = 0;
+            {
+                let mut objects = crate::binding().pinned_roots.borrow_mut();
+                for object in objects.drain(..) {
+                    memory_manager::unpin_object::<Ruby>(object);
+                    roots_unpinned += 1;
+                }
+            }
+            log::info!("Finished unpinning roots. {} roots unpinned.", roots_unpinned);
+
+            log::info!("Unpinning pinned PPPs...");
+            let mut ppps_unpinned = 0;
+            {
+                let mut objects = crate::binding().pinned_ppps.borrow_mut();
+                for object in objects.drain(..) {
+                    memory_manager::unpin_object::<Ruby>(object);
+                    ppps_unpinned += 1;
+                }
+            }
+            log::info!("Finished unpinning PPPs. {} PPPs unpinned.", ppps_unpinned);
         });
     }
 }

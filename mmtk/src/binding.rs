@@ -1,7 +1,9 @@
 use std::ffi::CString;
 use std::sync::Mutex;
 
+use atomic_refcell::AtomicRefCell;
 use mmtk::MMTK;
+use mmtk::util::ObjectReference;
 
 use crate::abi;
 use crate::abi::RubyBindingOptions;
@@ -27,6 +29,10 @@ pub struct RubyBinding {
     pub plan_name: Mutex<Option<CString>>,
     pub weak_proc: WeakProcessor,
     pub ppp_registry: crate::ppp::PPPRegistry,
+    /// Objects pinned during this GC.
+    pub(crate) pinned_ppps: AtomicRefCell<Vec<ObjectReference>>,
+    pub(crate) pinned_roots: AtomicRefCell<Vec<ObjectReference>>,
+
 }
 
 unsafe impl Sync for RubyBinding {}
@@ -48,6 +54,8 @@ impl RubyBinding {
             plan_name: Mutex::new(None),
             weak_proc: WeakProcessor::new(),
             ppp_registry: PPPRegistry::new(),
+            pinned_ppps: AtomicRefCell::new(Vec::new()),
+            pinned_roots: AtomicRefCell::new(Vec::new()),
         }
     }
 

@@ -55,6 +55,8 @@ impl Collection<Ruby> for VMCollection {
         let mut edges_count = 0;
         let mut pinning_edges_count = 0;
         let mut pin_set = HashSet::<ObjectReference>::new();
+        let mut pinned_ppps = crate::binding().pinned_ppps.borrow_mut();
+        let mut objects_pinned = 0;
         crate::binding().ppp_registry.foreach(|obj| {
             log::info!(
                 "  PPP#{}: {}{} {} {}",
@@ -76,6 +78,11 @@ impl Collection<Ruby> for VMCollection {
                 );
                 edges_count += 1;
                 if pin {
+                    if memory_manager::pin_object::<Ruby>(target_object) {
+                        pinned_ppps.push(target_object);
+                        objects_pinned += 1;
+                    }
+
                     pinning_edges_count += 1;
                     pin_set.insert(target_object);
                 }
@@ -93,6 +100,10 @@ impl Collection<Ruby> for VMCollection {
             edges_count,
             pinning_edges_count,
             pin_set.iter().len(),
+        );
+        log::info!(
+            "{} objects actually pinned by MMTk.",
+            objects_pinned,
         );
     }
 
