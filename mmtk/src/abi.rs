@@ -21,8 +21,24 @@ impl RubyObjectAccess {
         Self { objref }
     }
 
-    fn hidden_field(&self) -> Address {
+    pub fn obj_start(&self) -> Address {
         self.objref.to_raw_address().sub(Self::prefix_size())
+    }
+
+    pub fn payload_addr(&self) -> Address {
+        self.objref.to_raw_address()
+    }
+
+    pub fn suffix_addr(&self) -> Address {
+        self.objref.to_raw_address().add(self.payload_size())
+    }
+
+    pub fn obj_end(&self) -> Address {
+        self.suffix_addr() + Self::suffix_size()
+    }
+
+    fn hidden_field(&self) -> Address {
+        self.obj_start()
     }
 
     pub fn payload_size(&self) -> usize {

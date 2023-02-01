@@ -4,7 +4,7 @@ use crate::{upcalls, Ruby, RubyEdge};
 use mmtk::scheduler::GCWorker;
 use mmtk::util::{ObjectReference, VMWorkerThread};
 use mmtk::vm::{EdgeVisitor, ObjectTracer, RootsWorkFactory, Scanning};
-use mmtk::{Mutator, MutatorContext, memory_manager};
+use mmtk::{memory_manager, Mutator, MutatorContext};
 
 pub struct VMScanning {}
 
@@ -34,22 +34,29 @@ impl Scanning<Ruby> for VMScanning {
             object,
         );
         let gc_tls = unsafe { GCThreadTLS::from_vwt_check(tls) };
-        let visit_object = |_worker, target_object: ObjectReference, _pin| {
+        let visit_object = |_worker, target_object: ObjectReference, pin| {
             trace!("Tracing object: {} -> {}", object, target_object);
-            debug_assert!(
-                mmtk::memory_manager::is_mmtk_object(object.to_raw_address()),
-                "Source is not an MMTk object. Src: {} dst: {}",
-                object,
-                target_object
-            );
-            debug_assert!(
-                true || mmtk::memory_manager::is_mmtk_object(target_object.to_raw_address()),
-                "Destination is not an MMTk object. Src: {} dst: {}",
-                object,
-                target_object
-            );
-            object_tracer.trace_object(target_object)
+            // debug_assert!(
+            //     mmtk::memory_manager::is_mmtk_object(object.to_raw_address()),
+            //     "Source is not an MMTk object. Src: {} dst: {}",
+            //     object,
+            //     target_object
+            // );
+            // debug_assert!(
+            //     true || mmtk::memory_manager::is_mmtk_object(target_object.to_raw_address()),
+            //     "Destination is not an MMTk object. Src: {} dst: {}",
+            //     object,
+            //     target_object
+            // );
+            let forwarded = object_tracer.trace_object(target_object);
+            if pin {
+                debug_assert_eq!(forwarded, target_object);
+            }
+            forwarded
         };
+        if object.is_forwarded::<Ruby>() {
+            error!("scan_object_and_trace_edges called on forwarded object: {}", object);
+        }
         gc_tls
             .object_closure
             .set_temporarily_and_run_code(visit_object, || {
@@ -98,6 +105,65 @@ impl Scanning<Ruby> for VMScanning {
         crate::binding()
             .weak_proc
             .process_weak_stuff(worker, tracer_context);
+
+        {
+            let gc_tls = unsafe { GCThreadTLS::from_vwt_check(worker.tls) };
+
+            info!("Verifying if any root points to from-space object");
+            let all_roots: Vec<ObjectReference> = {
+                let mut root_set = crate::binding().root_set.lock().unwrap();
+                std::mem::take(root_set.as_mut())
+            };
+            for obj in all_roots {
+                if !memory_manager::is_mmtk_object(obj.to_address::<Ruby>()) {
+                    error!("Root doesn't point to mmtk object: {}", obj);
+                }
+                if obj.is_live() {
+                    if obj.is_forwarded::<Ruby>() {
+                        error!("Root is forwarded: {}", obj);
+                    }
+                } else {
+                    error!("Root is dead: {}", obj);
+                }
+
+            }
+
+            info!("Verifying if any object points to from-space object");
+            let mut all_objects = crate::binding().all_objects.lock().unwrap();
+            let mut new_all_objects = vec![];
+            for obj in all_objects.drain(..) {
+                if obj.is_live() {
+                    // if obj.is_forwarded::<Ruby>() {
+                    //     info!("  {} is forwarded", obj);
+                    // }
+                    let maybe_fwd = obj.get_forwarded_object();
+                    if let Some(fwd) = maybe_fwd {
+                        info!("  {} forwarded to {}", obj, fwd);
+                    } else {
+                        info!("  {} is not forwarded", obj);
+                    }
+                    let actual = maybe_fwd.unwrap_or(obj);
+
+                    let visit_object = |_, target: ObjectReference, _pin| {
+                        if target.is_forwarded::<Ruby>() {
+                            panic!("{} {} points to a forwarded object {}", actual, crate::collection::object_type_str(actual) ,target);
+                        }
+                        target
+                    };
+
+                    gc_tls
+                        .object_closure
+                        .set_temporarily_and_run_code(visit_object, || {
+                            (upcalls().scan_object_ruby_style)(actual);
+                        });
+
+                    new_all_objects.push(actual);
+                }
+            }
+            *all_objects = new_all_objects;
+            info!("Verification complete");
+        }
+
         false
     }
 
@@ -119,9 +185,11 @@ impl VMScanning {
         callback: F,
     ) {
         let mut buffer: Vec<ObjectReference> = Vec::new();
+        let mut my_roots = vec![];
         let mut my_pinned_roots = vec![];
         let visit_object = |_, object: ObjectReference, _pin| {
             debug!("[{}] Visiting root: {}", root_scan_kind, object);
+            my_roots.push(object);
             if memory_manager::pin_object::<Ruby>(object) {
                 my_pinned_roots.push(object);
             }
@@ -141,8 +209,12 @@ impl VMScanning {
         info!("Pinned {} node roots", my_pinned_roots.len());
 
         {
-            let mut pinned_roots = crate::binding().pinned_roots.borrow_mut();
+            let mut pinned_roots = crate::binding().pinned_roots.lock().unwrap();
             pinned_roots.append(&mut my_pinned_roots);
+        }
+
+        {
+            crate::binding().root_set.lock().unwrap().append(&mut my_roots);
         }
     }
 }

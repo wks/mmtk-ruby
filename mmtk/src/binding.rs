@@ -31,7 +31,9 @@ pub struct RubyBinding {
     pub ppp_registry: crate::ppp::PPPRegistry,
     /// Objects pinned during this GC.
     pub(crate) pinned_ppps: AtomicRefCell<Vec<ObjectReference>>,
-    pub(crate) pinned_roots: AtomicRefCell<Vec<ObjectReference>>,
+    pub(crate) pinned_roots: Mutex<Vec<ObjectReference>>,
+    pub all_objects: Mutex<Vec<ObjectReference>>,
+    pub root_set: Mutex<Vec<ObjectReference>>,
 
 }
 
@@ -55,7 +57,9 @@ impl RubyBinding {
             weak_proc: WeakProcessor::new(),
             ppp_registry: PPPRegistry::new(),
             pinned_ppps: AtomicRefCell::new(Vec::new()),
-            pinned_roots: AtomicRefCell::new(Vec::new()),
+            pinned_roots: Default::default(),
+            all_objects: Default::default(),
+            root_set: Default::default(),
         }
     }
 

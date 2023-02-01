@@ -40,12 +40,13 @@ impl ObjectModel<Ruby> for VMObjectModel {
         copy_context: &mut GCWorkerCopyContext<Ruby>,
     ) -> ObjectReference {
         let from_acc = RubyObjectAccess::from_objref(from);
+        let from_start = from_acc.obj_start();
         let object_size = from_acc.object_size();
         let to_start = copy_context.alloc_copy(from, object_size, MIN_OBJ_ALIGN, 0, semantics);
         let to_payload = to_start.add(OBJREF_OFFSET);
         unsafe {
             copy_nonoverlapping::<u8>(
-                from.to_raw_address().to_ptr(),
+                from_start.to_ptr(),
                 to_start.to_mut_ptr(),
                 object_size);
         }
@@ -75,11 +76,11 @@ impl ObjectModel<Ruby> for VMObjectModel {
     }
 
     fn ref_to_object_start(object: ObjectReference) -> Address {
-        object.to_raw_address() - Self::OBJREF_OFFSET
+        RubyObjectAccess::from_objref(object).obj_start()
     }
 
     fn ref_to_header(object: ObjectReference) -> Address {
-        object.to_raw_address()
+        RubyObjectAccess::from_objref(object).payload_addr()
     }
 
     fn address_to_ref(addr: Address) -> ObjectReference {

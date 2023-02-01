@@ -60,18 +60,18 @@ impl WeakProcessor {
             let mut new_candidates = Vec::new();
 
             for object in obj_free_candidates.iter().copied() {
-                info!("Processing obj_free candidate: {}", object);
+//                info!("Processing obj_free candidate: {}", object);
                 if object.is_reachable() {
                     // Forward and add back to the candidate list.
                     let new_object = tracer.trace_object(object);
-                    info!(
-                        "Forwarding obj_free candidate: {} -> {}",
-                        object,
-                        new_object
-                    );
+                    // info!(
+                    //     "Forwarding obj_free candidate: {} -> {}",
+                    //     object,
+                    //     new_object
+                    // );
                     new_candidates.push(new_object);
                 } else {
-                    info!("  Dead. Call obj_free...: {}", object);
+//                    info!("  Dead. Call obj_free...: {}", object);
                     (upcalls().call_obj_free)(object);
                 }
             }
@@ -79,10 +79,11 @@ impl WeakProcessor {
             *obj_free_candidates = new_candidates;
 
             // Forward global weak tables
-            let forward_object = |_worker, object: ObjectReference, _pin| {
-                debug_assert!(mmtk::memory_manager::is_mmtk_object(
-                    VMObjectModel::ref_to_address(object)
-                ));
+            let forward_object = |_worker, object: ObjectReference, pin: bool| {
+                debug_assert!(!pin);
+                // debug_assert!(mmtk::memory_manager::is_mmtk_object(
+                //     VMObjectModel::ref_to_address(object)
+                // ));
                 let result = tracer.trace_object(object);
                 trace!("Forwarding reference: {} -> {}", object, result);
                 result
@@ -116,7 +117,7 @@ impl WeakProcessor {
             log::info!("Unpinning pinned roots...");
             let mut roots_unpinned = 0;
             {
-                let mut objects = crate::binding().pinned_roots.borrow_mut();
+                let mut objects = crate::binding().pinned_roots.lock().unwrap();
                 for object in objects.drain(..) {
                     memory_manager::unpin_object::<Ruby>(object);
                     roots_unpinned += 1;

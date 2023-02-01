@@ -11,7 +11,7 @@ use std::thread;
 
 pub struct VMCollection {}
 
-fn show_cstr(cstr: *const libc::c_char) -> Cow<'static, str> {
+pub fn show_cstr(cstr: *const libc::c_char) -> Cow<'static, str> {
     if cstr.is_null() {
         return Cow::Borrowed("(null)")
     }
@@ -20,11 +20,11 @@ fn show_cstr(cstr: *const libc::c_char) -> Cow<'static, str> {
     type_str
 }
 
-fn object_type_str(object: ObjectReference) -> Cow<'static, str> {
+pub fn object_type_str(object: ObjectReference) -> Cow<'static, str> {
     show_cstr((upcalls().object_type_str)(object))
 }
 
-fn detail_type_str(object: ObjectReference) -> String {
+pub fn detail_type_str(object: ObjectReference) -> String {
     let orig = show_cstr((upcalls().detail_type_str)(object));
     let one_line = orig.replace("\n", "");
     let max_len = 50;
@@ -58,7 +58,7 @@ impl Collection<Ruby> for VMCollection {
         let mut pinned_ppps = crate::binding().pinned_ppps.borrow_mut();
         let mut objects_pinned = 0;
         crate::binding().ppp_registry.foreach(|obj| {
-            log::info!(
+            log::trace!(
                 "  PPP#{}: {}{} {} {}",
                 ppp_count,
                 obj,
@@ -69,7 +69,7 @@ impl Collection<Ruby> for VMCollection {
             ppp_count += 1;
 
             let visit_object = |_worker, target_object: ObjectReference, pin| {
-                log::info!(
+                log::trace!(
                     "    -> {} {} {} {}",
                     if pin { "(pin)" } else { "     " },
                     target_object,
@@ -94,14 +94,14 @@ impl Collection<Ruby> for VMCollection {
                     (upcalls().scan_object_ruby_style)(obj);
                 });
         });
-        log::info!(
+        log::trace!(
             "Total: {} PPPs, {} edges, {} pinning edges, {} unique objects pinned.",
             ppp_count,
             edges_count,
             pinning_edges_count,
             pin_set.iter().len(),
         );
-        log::info!(
+        log::trace!(
             "{} objects actually pinned by MMTk.",
             objects_pinned,
         );

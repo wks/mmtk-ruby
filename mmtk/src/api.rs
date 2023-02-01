@@ -127,7 +127,8 @@ pub extern "C" fn mmtk_post_alloc(
     bytes: usize,
     semantics: AllocationSemantics,
 ) {
-    memory_manager::post_alloc::<Ruby>(unsafe { &mut *mutator }, refer, bytes, semantics)
+    memory_manager::post_alloc::<Ruby>(unsafe { &mut *mutator }, refer, bytes, semantics);
+    binding().all_objects.lock().unwrap().push(refer);
 }
 
 #[no_mangle]
