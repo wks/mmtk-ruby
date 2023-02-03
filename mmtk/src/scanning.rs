@@ -54,9 +54,6 @@ impl Scanning<Ruby> for VMScanning {
             }
             forwarded
         };
-        if object.is_forwarded::<Ruby>() {
-            error!("scan_object_and_trace_edges called on forwarded object: {}", object);
-        }
         gc_tls
             .object_closure
             .set_temporarily_and_run_code(visit_object, || {
@@ -119,49 +116,51 @@ impl Scanning<Ruby> for VMScanning {
                     error!("Root doesn't point to mmtk object: {}", obj);
                 }
                 if obj.is_live() {
-                    if obj.is_forwarded::<Ruby>() {
-                        error!("Root is forwarded: {}", obj);
-                    }
+                    // if obj.is_forwarded::<Ruby>() {
+                    //     error!("Root is forwarded: {}", obj);
+                    // }
                 } else {
                     error!("Root is dead: {}", obj);
                 }
 
             }
 
-            info!("Verifying if any object points to from-space object");
-            let mut all_objects = crate::binding().all_objects.lock().unwrap();
-            let mut new_all_objects = vec![];
-            for obj in all_objects.drain(..) {
-                if obj.is_live() {
-                    // if obj.is_forwarded::<Ruby>() {
-                    //     info!("  {} is forwarded", obj);
-                    // }
-                    let maybe_fwd = obj.get_forwarded_object();
-                    if let Some(fwd) = maybe_fwd {
-                        info!("  {} forwarded to {}", obj, fwd);
-                    } else {
-                        info!("  {} is not forwarded", obj);
-                    }
-                    let actual = maybe_fwd.unwrap_or(obj);
-
-                    let visit_object = |_, target: ObjectReference, _pin| {
-                        if target.is_forwarded::<Ruby>() {
-                            panic!("{} {} points to a forwarded object {}", actual, crate::collection::object_type_str(actual) ,target);
+            if false {
+                info!("Verifying if any object points to from-space object");
+                let mut all_objects = crate::binding().all_objects.lock().unwrap();
+                let mut new_all_objects = vec![];
+                for obj in all_objects.drain(..) {
+                    if obj.is_live() {
+                        // if obj.is_forwarded::<Ruby>() {
+                        //     info!("  {} is forwarded", obj);
+                        // }
+                        let maybe_fwd = obj.get_forwarded_object();
+                        if let Some(fwd) = maybe_fwd {
+                            info!("  {} forwarded to {}", obj, fwd);
+                        } else {
+                            info!("  {} is not forwarded", obj);
                         }
-                        target
-                    };
+                        let actual = maybe_fwd.unwrap_or(obj);
 
-                    gc_tls
-                        .object_closure
-                        .set_temporarily_and_run_code(visit_object, || {
-                            (upcalls().scan_object_ruby_style)(actual);
-                        });
+                        let visit_object = |_, target: ObjectReference, _pin| {
+                            if target.is_forwarded::<Ruby>() {
+                                panic!("{} {} points to a forwarded object {}", actual, crate::collection::object_type_str(actual) ,target);
+                            }
+                            target
+                        };
 
-                    new_all_objects.push(actual);
+                        gc_tls
+                            .object_closure
+                            .set_temporarily_and_run_code(visit_object, || {
+                                (upcalls().scan_object_ruby_style)(actual);
+                            });
+
+                        new_all_objects.push(actual);
+                    }
                 }
+                *all_objects = new_all_objects;
+                info!("Verification complete");
             }
-            *all_objects = new_all_objects;
-            info!("Verification complete");
         }
 
         false

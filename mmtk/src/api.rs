@@ -231,5 +231,6 @@ pub extern "C" fn mmtk_free_raw_vec_of_obj_ref(raw_vec: RawVecOfObjRef) {
 
 #[no_mangle]
 pub extern "C" fn mmtk_register_ppp(object: ObjectReference) {
+    debug_assert!(memory_manager::is_mmtk_object(object.to_raw_address()));
     crate::binding().ppp_registry.register(object)
 }

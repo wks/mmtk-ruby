@@ -104,7 +104,11 @@ impl WeakProcessor {
             crate::binding().ppp_registry.retain_mut(|obj| {
                 ppp_count += 1;
                 if obj.is_live() {
-                    *obj = obj.get_forwarded_object().unwrap_or(*obj);
+                    let forwarded = obj.get_forwarded_object().unwrap_or(*obj);
+                    if forwarded.to_raw_address().as_usize() == 0x8 {
+                        panic!("8!");
+                    }
+                    *obj = forwarded;
                     retain_count += 1;
                     true
                 } else {
