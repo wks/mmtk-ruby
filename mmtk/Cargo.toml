@@ -28,10 +28,11 @@ atomic_refcell = "0.1.9"
 
 [dependencies.mmtk]
 features = ["is_mmtk_object", "object_pinning"]
+#features = ["is_mmtk_object", "object_pinning", "sanity"]
 
 # Uncomment one of the following lines to choose where to find mmtk-core.
-git = "https://github.com/mmtk/mmtk-core.git"  # Use mmtk-core from the official repository.
-#path = "../../mmtk-core"  # Use mmtk-core from a local repository.
+#git = "https://github.com/mmtk/mmtk-core.git"  # Use mmtk-core from the official repository.
+path = "../../mmtk-core"  # Use mmtk-core from a local repository.
 
 [features]
 default = ["clear_old_copy"]

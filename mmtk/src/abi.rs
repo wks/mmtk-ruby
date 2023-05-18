@@ -1,3 +1,5 @@
+use std::ffi;
+
 use crate::api::RubyMutator;
 use crate::{upcalls, Ruby};
 use mmtk::scheduler::{GCController, GCWorker};
@@ -320,6 +322,40 @@ impl From<Vec<ObjectReference>> for RawVecOfObjRef {
     }
 }
 
+type StringClosureFunction = extern "C" fn(str: *const ffi::c_char, data: *mut ffi::c_void);
+
+/// A closure for C to pass string pointer back to Rust.
+/// It doesn't give Rust the ownership of the C string.  The Rust code should copy the string.
+#[repr(C)]
+pub struct StringClosure {
+    /// The function to be called from C.
+    pub c_function: StringClosureFunction,
+    /// The pointer to the Rust-level closure object.
+    pub rust_closure: *mut libc::c_void,
+}
+
+impl StringClosure {
+    pub fn from_rust_closure<F>(f: &mut F) -> Self
+    where
+        F: FnMut(*const ffi::c_char),
+    {
+        let c_function = Self::c_function::<F>;
+        let rust_closure = f as *mut F as *mut libc::c_void;
+        Self {
+            c_function,
+            rust_closure,
+        }
+    }
+
+    extern "C" fn c_function<F>(str: *const ffi::c_char, data: *mut ffi::c_void)
+    where
+        F: FnMut(*const ffi::c_char),
+    {
+        let rust_closure = unsafe {&mut *(data as *mut F)};
+        rust_closure(str);
+    }
+}
+
 #[repr(C)]
 #[derive(Clone)]
 pub struct RubyBindingOptions {
@@ -349,6 +385,8 @@ pub struct RubyUpcalls {
     pub update_global_weak_tables: extern "C" fn(),
     pub get_original_givtbl: extern "C" fn(object: ObjectReference) -> *mut libc::c_void,
     pub move_givtbl: extern "C" fn(old_objref: ObjectReference, new_objref: ObjectReference),
+    pub dump_type: extern "C" fn(object: ObjectReference, closure: StringClosure),
+    pub dump_comment: extern "C" fn(object: ObjectReference, closure: StringClosure),
 }
 
 unsafe impl Sync for RubyUpcalls {}

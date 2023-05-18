@@ -1,7 +1,7 @@
 use std::ptr::copy_nonoverlapping;
 
-use crate::abi::{RubyObjectAccess, MIN_OBJ_ALIGN, OBJREF_OFFSET};
-use crate::{abi, Ruby};
+use crate::abi::{RubyObjectAccess, StringClosure, MIN_OBJ_ALIGN, OBJREF_OFFSET};
+use crate::{abi, upcalls, Ruby};
 use mmtk::util::constants::BITS_IN_BYTE;
 use mmtk::util::copy::{CopySemantics, GCWorkerCopyContext};
 use mmtk::util::{Address, ObjectReference};
@@ -134,5 +134,33 @@ impl ObjectModel<Ruby> for VMObjectModel {
 
     fn dump_object(_object: ObjectReference) {
         todo!()
+    }
+
+    /// Return a human-readable string that represents the type of the object.
+    /// Used during debugging or heap dumping.
+    /// Return `None` if type information is not available.
+    fn dump_type(object: ObjectReference) -> Option<String> {
+        let mut out = None;
+        let closure = StringClosure::from_rust_closure(&mut |str: *const libc::c_char| {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(str) };
+            out = Some(c_str.to_str().unwrap().to_string());
+        });
+        (upcalls().dump_type)(object, closure);
+        out
+    }
+
+    /// Return a human-readable string that represents other details of the object.
+    /// Used during debugging or heap dumping.
+    /// It could be anything helpful for debugging.
+    /// The returned string may contain multiple lines.
+    /// Return `None` if type information is not available.
+    fn dump_comment(object: ObjectReference) -> Option<String> {
+        let mut out = None;
+        let closure = StringClosure::from_rust_closure(&mut |str: *const libc::c_char| {
+            let c_str = unsafe { std::ffi::CStr::from_ptr(str) };
+            out = Some(c_str.to_str().unwrap().to_string());
+        });
+        (upcalls().dump_comment)(object, closure);
+        out
     }
 }

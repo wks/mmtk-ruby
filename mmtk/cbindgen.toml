@@ -29,6 +29,7 @@ typedef uint32_t MMTk_AllocationSemantics;
 "GCThreadTLS" = "MMTk_GCThreadTLS"
 "RubyUpcalls" = "MMTk_RubyUpcalls"
 "ObjectClosure" = "MMTk_ObjectClosure"
+"StringClosure" = "MMTk_StringClosure"
 "VMThread" = "MMTk_VMThread"
 "VMMutatorThread" = "MMTk_VMMutatorThread"
 "VMWorkerThread" = "MMTk_VMWorkerThread"
