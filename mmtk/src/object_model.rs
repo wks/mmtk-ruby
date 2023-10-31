@@ -20,11 +20,12 @@ impl ObjectModel<Ruby> for VMObjectModel {
     const LOCAL_FORWARDING_POINTER_SPEC: VMLocalForwardingPointerSpec =
         VMLocalForwardingPointerSpec::in_header(-((OBJREF_OFFSET * BITS_IN_BYTE) as isize));
 
+    // Reusing the `FL_PROMOTED` and `FL_UNUSED6`.
     const LOCAL_FORWARDING_BITS_SPEC: VMLocalForwardingBitsSpec =
-        VMLocalForwardingBitsSpec::side_first();
+        VMLocalForwardingBitsSpec::in_header(5);
 
     const LOCAL_MARK_BIT_SPEC: VMLocalMarkBitSpec =
-        VMLocalMarkBitSpec::side_after(Self::LOCAL_FORWARDING_BITS_SPEC.as_spec());
+        VMLocalMarkBitSpec::side_first();
 
     const LOCAL_PINNING_BIT_SPEC: VMLocalPinningBitSpec =
         VMLocalPinningBitSpec::side_after(Self::LOCAL_MARK_BIT_SPEC.as_spec());
