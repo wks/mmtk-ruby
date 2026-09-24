@@ -4,6 +4,8 @@
 
 use std::ffi::CStr;
 
+use crate::Ruby;
+use crate::RubySlot;
 use crate::abi;
 use crate::abi::HiddenHeader;
 use crate::abi::RawVecOfObjRef;
@@ -11,8 +13,9 @@ use crate::abi::RubyBindingOptions;
 use crate::binding;
 use crate::binding::RubyBinding;
 use crate::mmtk;
-use crate::Ruby;
-use crate::RubySlot;
+use mmtk::AllocationSemantics;
+use mmtk::MMTKBuilder;
+use mmtk::Mutator;
 use mmtk::memory_manager;
 use mmtk::memory_manager::mmtk_init;
 use mmtk::util::alloc::AllocatorInfo;
@@ -23,9 +26,6 @@ use mmtk::util::options::GCTriggerSelector;
 use mmtk::util::options::PlanSelector;
 use mmtk::util::{Address, ObjectReference};
 use mmtk::util::{VMMutatorThread, VMThread};
-use mmtk::AllocationSemantics;
-use mmtk::MMTKBuilder;
-use mmtk::Mutator;
 
 // For cbindgen to generate simple type names.
 /// cbindgen:ignore
