@@ -99,7 +99,7 @@ impl Scanning<Ruby> for VMScanning {
 
         'gen_wb_unprotected_work: {
             let is_nursery_gc = (crate::mmtk().get_plan().generational())
-                .is_some_and(|gen| gen.is_current_gc_nursery());
+                .is_some_and(|gen_plan| gen_plan.is_current_gc_nursery());
             if !is_nursery_gc {
                 break 'gen_wb_unprotected_work;
             }
